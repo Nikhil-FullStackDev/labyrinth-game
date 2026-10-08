@@ -133,3 +133,7 @@ test('bots finish whole games for 2, 3 and 4 players', () => {
     }
   }
 });
+
+test('the starting spare tile never has a treasure', () => {
+  for (let seed = 1; seed <= 300; seed++) assert.strictEqual(mk(2 + (seed % 3), seed).spare.x, -1, `seed ${seed}`);
+});

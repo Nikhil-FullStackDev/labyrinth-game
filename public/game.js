@@ -57,6 +57,9 @@
     add('T', 6, 3); add('L', 15, 3); add('I', 13, 0);
     shuffle(mov, rnd);
     for (const m of mov) m.i = tid++;
+    // The starting spare never carries a treasure, so nobody is confused about it.
+    const free = mov.findIndex(m => m.x < 0);
+    [mov[free], mov[mov.length - 1]] = [mov[mov.length - 1], mov[free]];
     const spare = mov.pop();
     for (let r = 0; r < 7; r++) for (let c = 0; c < 7; c++) if (!board[r][c]) board[r][c] = mov.pop();
 
