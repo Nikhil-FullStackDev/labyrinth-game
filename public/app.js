@@ -259,9 +259,10 @@
     const fresh = lastSeq < 0 || v.seq > lastSeq + 2 || v.seq < lastSeq;
     const ev = v.ev;
     if (v.seq !== lastSeq) { selSlot = selTo = null; }
-    if (!fresh && ev && v.seq === lastSeq + 1) {
-      if (ev.k === 'move') animateMove(ev);
-      else if (ev.k === 'push') lockUntil = Date.now() + 420;
+    if (!fresh && ev && v.seq > lastSeq && v.seq <= lastSeq + 2) {
+      if (ev.k === 'move' && v.seq === lastSeq + 1) animateMove(ev);
+      else if (ev.k === 'push' || ev.auto) lockUntil = Date.now() + 420;
+      if (ev.auto) toast(ev.by === you ? 'No way out: you stay put' : `${v.players[ev.by].name} is boxed in and stays put`);
       if (ev.k === 'move' && ev.got >= 0) {
         toast(ev.by === you ? `You found the ${Lab.TREASURE_LABELS[ev.got]}!` : `${v.players[ev.by].name} found the ${Lab.TREASURE_LABELS[ev.got]}`);
         if (ev.by === you) buzz([30, 40, 30]);

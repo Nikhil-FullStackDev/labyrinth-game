@@ -66,7 +66,8 @@ test('game: only own cards are sent, turn order enforced, lobby return', async (
   assert.strictEqual((await post('/api/act', { code: a.code, token: 'nope', a: {} })).status, 403);
   const ok = await post('/api/act', { code: a.code, token: a.token, a: { type: 'insert', slot: 'N1', rot: 0 } });
   assert.strictEqual(ok.status, 200);
-  assert.strictEqual((await firstSnap(a.code, a.token)).game.phase, 'move');
+  const g = (await firstSnap(a.code, a.token)).game;
+  assert.ok(g.phase === 'move' || g.seq === 2); // boxed in = move taken automatically
   assert.strictEqual((await post('/api/lobby', { code: a.code, token: a.token })).status, 200);
   assert.strictEqual((await firstSnap(a.code, a.token)).game, null);
 });
@@ -76,9 +77,10 @@ test('a bot seat plays by itself', async () => {
   await post('/api/addbot', { code: a.code, token: a.token });
   await post('/api/start', { code: a.code, token: a.token });
   await post('/api/act', { code: a.code, token: a.token, a: { type: 'insert', slot: 'N3', rot: 1 } });
-  await post('/api/act', { code: a.code, token: a.token, a: { type: 'move', to: [0, 0] } });
+  const mid = (await firstSnap(a.code, a.token)).game;
+  if (mid.phase === 'move') await post('/api/act', { code: a.code, token: a.token, a: { type: 'move', to: [0, 0] } });
   await new Promise(r => setTimeout(r, 3500)); // bot: insert (~1.5s) + move (~1.2s)
   const s = await firstSnap(a.code, a.token);
-  assert.strictEqual(s.game.seq, 4);
+  assert.ok(s.game.seq >= 4);
   assert.strictEqual(s.game.turn, 0);
 });

@@ -136,6 +136,12 @@
       push(state, a.slot);
       state.last = a.slot; state.phase = 'move'; state.seq++;
       state.ev = { k: 'push', slot: a.slot, by: pid };
+      // Boxed in after the push: nothing to choose, so the move is taken (staying put) automatically.
+      const R = reach(state, p.pos);
+      if (R.dist.reduce((n, d) => n + (d >= 0 ? 1 : 0), 0) === 1) {
+        act(state, pid, { type: 'move', to: p.pos });
+        if (state.ev) state.ev.auto = true;
+      }
       return { ok: true };
     }
     if (a.type === 'move') {

@@ -60,8 +60,11 @@ test('every slot push is its own inverse via the opposite slot', () => {
   }
 });
 
+// A board where the first player still has somewhere to walk after pushing N1 (otherwise the move is skipped).
+const openSeed = () => { for (let seed = 1; ; seed++) { const s = mk(2, seed); G.act(s, 0, { type: 'insert', slot: 'N1', rot: 2 }); if (s.phase === 'move') return seed; } };
+
 test('turn order, undo ban, and move validation', () => {
-  const s = mk(2);
+  const s = mk(2, openSeed());
   assert.ok(G.act(s, 1, { type: 'insert', slot: 'N1', rot: 0 }).error); // wrong player
   assert.ok(G.act(s, 0, { type: 'move', to: [0, 0] }).error);           // must insert first
   assert.ok(G.act(s, 0, { type: 'insert', slot: 'Z9', rot: 0 }).error);
@@ -136,4 +139,19 @@ test('bots finish whole games for 2, 3 and 4 players', () => {
 
 test('the starting spare tile never has a treasure', () => {
   for (let seed = 1; seed <= 300; seed++) assert.strictEqual(mk(2 + (seed % 3), seed).spare.x, -1, `seed ${seed}`);
+});
+
+test('a boxed-in pawn skips the move step automatically', () => {
+  const s = mk(2, 5), p = s.players[0];
+  // Wall the pawn in: make its corner and both neighbours dead ends.
+  s.board[0][0] = { i: 0, t: 'L', r: 0, x: -1 };         // opens N,E -> E is the only exit
+  s.board[0][1] = { i: 16, t: 'I', r: 1, x: -1 };        // E-W corridor
+  s.board[0][1] = { ...s.board[0][1], r: 0 };            // N-S: closed towards the corner
+  const R = G.reach(s, p.pos);
+  assert.strictEqual(R.dist.filter(d => d >= 0).length, 1);
+  assert.ok(!G.act(s, 0, { type: 'insert', slot: 'S5', rot: 0 }).error);
+  assert.strictEqual(s.turn, 1);
+  assert.strictEqual(s.phase, 'insert');
+  assert.strictEqual(s.ev.k, 'move');
+  assert.ok(s.ev.auto);
 });
