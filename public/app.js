@@ -78,7 +78,7 @@
       <li><b>Each turn:</b> rotate the spare tile, push it in from one of the 12 arrows, then move your pawn along any open path.</li>
       <li>The pushed-out tile becomes the new spare. Pawns on it ride around to the opposite end.</li>
       <li>You can't push the tile straight back where the last player pushed it from.</li>
-      <li>Collect your treasures in order (your current target glows gold). Others can't see your list.</li>
+      <li>Collect your treasures in order (your target is shown under the board). Others can't see your list.</li>
       <li>After your last treasure, run back to your corner. First home wins.</li>
       <li><b>Tap to confirm:</b> pick an arrow, tap it again (or press the button) to push. Tap a green square, tap again to move.</li></ul>
       <button class="btn pri" data-close>Got it</button>`);
@@ -334,18 +334,15 @@
     const canMove = myTurn && v.phase === 'move' && !locked && !busy;
 
     // tiles
-    const myTarget = me && me.cards && me.got < me.total ? me.cards[me.got] : -2;
     for (let r = 0; r < 7; r++) for (let c = 0; c < 7; c++) {
       const t = v.board[r][c], el = tileEl(t);
       setPos(el, RING + c, RING + r); setRot(el, t.r); settle(el);
       el.classList.toggle('done', t.x >= 0 && v.found.includes(t.x));
-      el.classList.toggle('tgt', t.x >= 0 && t.x === myTarget);
       el.classList.remove('spare', 'mine');
     }
     const sp = tileEl(v.spare);
     setPos(sp, ui.sx, ui.sy); setRot(sp, spareRot); settle(sp);
     sp.classList.add('spare'); sp.classList.toggle('mine', canInsert);
-    sp.classList.toggle('tgt', v.spare.x >= 0 && v.spare.x === myTarget);
     sp.classList.toggle('done', v.spare.x >= 0 && v.found.includes(v.spare.x));
 
     // home corners + pawns

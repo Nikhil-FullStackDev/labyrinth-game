@@ -2,7 +2,7 @@
 
 A mobile-first take on the sliding-maze treasure hunt for 2–4 players: play against bots instantly, or create a room and share the 4-letter code with friends (bots can fill empty seats).
 
-**Rules in brief:** each turn, rotate the spare tile, push it in from one of the 12 arrows (never straight back where the last player pushed from), then walk your pawn along any open path. Collect your treasures in order (your current target glows gold; opponents can't see your list), then run back to your corner. First home wins. 12 treasures are dealt out evenly, so a 2-player game is 6 each.
+**Rules in brief:** each turn, rotate the spare tile, push it in from one of the 12 arrows (never straight back where the last player pushed from), then walk your pawn along any open path. Collect your treasures in order (your current target is shown under the board; opponents can't see your list), then run back to your corner. First home wins. 12 treasures are dealt out evenly, so a 2-player game is 6 each.
 
 - `public/game.js` is the rules engine, shared by the server and browser.
 - `public/bot.js` is the bot. It only uses what a real player can see: the board and its own cards.

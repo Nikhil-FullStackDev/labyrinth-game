@@ -69,7 +69,6 @@ button { touch-action: manipulation; cursor: pointer; }
 .tile .b { width: 100%; height: 100%; display: block; transition: transform .25s ease-out; pointer-events: none; }
 .tile .t { position: absolute; left: 50%; top: 50%; width: 66%; height: 66%; object-fit: contain; transform: translate(-50%, -50%); filter: drop-shadow(0 2px 2px #0008); pointer-events: none; transition: opacity .4s, filter .4s; }
 .tile.done .t { opacity: .22; filter: grayscale(1); }
-.tile.tgt::before { content: ''; position: absolute; inset: 2px; border-radius: 22%; box-shadow: 0 0 0 3px var(--gold), 0 0 14px 2px var(--gold); animation: pulse 1.4s ease-in-out infinite; z-index: 2; pointer-events: none; }
 .tile.fixed::after { content: ''; position: absolute; right: 8%; bottom: 8%; width: 12%; height: 12%; border-radius: 50%; background: #2a1b0d; box-shadow: 0 0 0 1px #c9a15a88; opacity: .8; }
 .tile.spare { z-index: 5; }
 .tile.spare.mine { filter: drop-shadow(0 0 8px #f5b80099); }
