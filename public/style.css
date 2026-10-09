@@ -138,3 +138,16 @@ button { touch-action: manipulation; cursor: pointer; }
   .arrow::before, .tile.tgt::before, .pawn.turn, .cell.sel { animation: none !important; }
 }
 @media (max-height: 640px) and (orientation: portrait) { .logo img { width: 64px; height: 64px; } .logo h1 { font-size: 28px; } }
+
+/* ---------- mobile polish ---------- */
+html { -webkit-text-size-adjust: 100%; }
+body { overflow-x: hidden; }
+img { max-width: 100%; }
+@media (pointer: coarse) {
+  button, .btn, select { min-height: 44px; touch-action: manipulation; }
+  input, .field { font-size: 16px; min-height: 44px; } /* >=16px stops iOS zoom-on-focus */
+}
+@media (max-width: 380px) {
+  .page { padding-left: 12px; padding-right: 12px; }
+  .logo h1 { font-size: 30px; }
+}
