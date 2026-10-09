@@ -247,5 +247,11 @@ setInterval(() => {
   creates.forEach((v, k) => { if (now > v.reset) creates.delete(k); });
 }, 600e3).unref();
 
+// Render sends SIGTERM on redeploy/restart: stop accepting, drop open streams, exit promptly.
+process.on('SIGTERM', () => {
+  server.close(() => process.exit(0));
+  server.closeAllConnections?.();
+  setTimeout(() => process.exit(0), 3000).unref();
+});
 if (require.main === module) server.listen(PORT, HOST, () => console.log(`Labyrinth on http://localhost:${PORT}`));
 module.exports = server;
