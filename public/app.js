@@ -169,6 +169,8 @@
       <div class="card"><h2>Players (${n}/4)</h2><div class="plist">${s.lobby.map((p, i) =>
         `<div class="pl" style="--c:${p.color}"><i></i><b>${esc(p.name)}${i === s.you ? ' (you)' : ''}</b><small>${i === 0 ? 'host' : p.bot ? 'bot' : p.connected ? '' : 'offline'}</small>${s.host && i > 0 ? `<button class="x" data-kick="${i}" aria-label="Remove">✕</button>` : ''}</div>`).join('')}</div>
         ${s.host ? `<button class="btn" id="bot" ${n >= 4 ? 'disabled' : ''}>+ Add bot</button>` : ''}</div>
+      ${s.voice ? `<a class="btn pri" href="${esc(s.voice)}" target="_blank" rel="noopener noreferrer" style="text-align:center;text-decoration:none">🎙 Join voice chat</a>` : ''}
+      ${s.host ? `<div class="row"><input class="field" id="voice" placeholder="Voice chat link (Discord / Meet…)" value="${esc(s.voice || '')}"><button class="btn" id="setvoice" style="flex:none">Set</button></div>` : ''}
       ${s.host ? `<button class="btn pri" id="start" ${n < 2 ? 'disabled' : ''}>${n < 2 ? 'Need 2+ players' : 'Start game'}</button>` : '<div class="tiny">Waiting for the host to start…</div>'}
       <button class="btn sm bad" id="leave">Leave room</button>
       <div class="err" id="err"></div></div>`;
@@ -181,6 +183,7 @@
     $('#leave').onclick = async () => { await call('/api/leave', { code: net.code, token: net.token }); leaveNet(); home(); };
     if (s.host) {
       $('#bot').onclick = () => hostCall('/api/addbot');
+      $('#setvoice').onclick = () => hostCall('/api/settings', { voice: $('#voice').value });
       $('#start').onclick = () => hostCall('/api/start');
       app.querySelectorAll('[data-kick]').forEach(b => b.onclick = () => hostCall('/api/kick', { index: +b.dataset.kick }));
     }
@@ -452,7 +455,9 @@
   }
 
   function menu() {
+    const voice = net && net.snap && net.snap.voice;
     const s = sheet(`<h2>Menu</h2>
+      ${voice ? `<a class="btn pri" href="${esc(voice)}" target="_blank" rel="noopener noreferrer" style="text-align:center;text-decoration:none">🎙 Join voice chat</a>` : ''}
       <button class="btn" id="m-how">How to play</button>
       <button class="btn bad" id="m-quit">${local ? 'Quit to menu' : 'Leave game'}</button>
       <button class="btn pri" data-close>Back to game</button>`);
@@ -499,4 +504,23 @@
   const saved = (() => { try { return JSON.parse(store.get('lab-sess')); } catch { return null; } })();
   if (saved && saved.code && saved.token) { net = { code: saved.code, token: saved.token, es: null, snap: null }; connect(); }
   else home();
+// "Your time is running out" badge: only the player the table is waiting on sees it, for the last 30 seconds.
+(function idleBadge(getSnap) {
+  const el = document.createElement('div');
+  el.id = 'idlebadge'; el.setAttribute('role', 'status'); el.hidden = true;
+  el.style.cssText = 'position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);z-index:50;padding:6px 14px;border-radius:99px;background:#000c;color:#fff;font:600 14px system-ui,sans-serif;pointer-events:none;white-space:nowrap';
+  document.body.appendChild(el);
+  let last = null, t0 = 0;
+  setInterval(() => {
+    const s = getSnap();
+    if (s !== last) { last = s; t0 = Date.now(); }
+    const ms = s && s.idleMsLeft != null ? s.idleMsLeft - (Date.now() - t0) : null;
+    if (ms == null || ms > 30000) { el.hidden = true; return; }
+    const sec = Math.max(0, Math.ceil(ms / 1000));
+    el.hidden = false;
+    el.textContent = sec ? `\u23f1 ${sec}s to move, then a bot plays for you` : '\u23f1 Time is up: a bot is playing for you';
+    el.style.background = sec <= 10 ? '#b3262ecc' : '#000c';
+  }, 500);
+})(() => net && net.snap);
+
 })();
