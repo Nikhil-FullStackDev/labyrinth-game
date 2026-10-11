@@ -84,3 +84,14 @@ test('a bot seat plays by itself', async () => {
   assert.ok(s.game.seq >= 4);
   assert.strictEqual(s.game.turn, 0);
 });
+
+test('voice chat link: host-only, http(s) only, shown in the snapshot', async () => {
+  const c = (await post('/api/create', { name: 'Host' })).body;
+  const j = (await post('/api/join', { code: c.code, name: 'Guest' })).body;
+  assert.strictEqual((await post('/api/settings', { code: c.code, token: j.token, voice: 'https://meet.example.com/x' })).status, 403);
+  assert.strictEqual((await post('/api/settings', { code: c.code, token: c.token, voice: 'javascript:alert(1)' })).status, 400);
+  assert.strictEqual((await post('/api/settings', { code: c.code, token: c.token, voice: ' https://meet.example.com/x ' })).status, 200);
+  assert.strictEqual((await firstSnap(c.code, j.token)).voice, 'https://meet.example.com/x');
+  assert.strictEqual((await post('/api/settings', { code: c.code, token: c.token, voice: '' })).status, 200);
+  assert.strictEqual((await firstSnap(c.code, c.token)).voice, '');
+});
