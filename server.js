@@ -17,6 +17,7 @@ const MIME = {
   '.json': 'application/manifest+json', '.webp': 'image/webp', '.png': 'image/png', '.svg': 'image/svg+xml',
 };
 const MAX_ROOMS = 200, MAX_STREAMS_PER_SEAT = 3, MAX_CREATE_PER_HOUR = 30, TAKEOVER_MS = 25e3;
+const TURN_MS = Number(process.env.TURN_MS) || 90e3, AWAY_MS = Number(process.env.AWAY_MS) || 10e3, MAX_STRIKES = 2; // an online player idle this long is auto-played; two misses in a row = they get only AWAY_MS per turn until they move again
 const NAMES = ['Ada', 'Bram', 'Cleo', 'Dax'];
 
 // ---------- static files (loaded once) ----------
@@ -65,7 +66,7 @@ const cleanName = n => String(n || '').replace(/[^\w \-']/g, '').trim().slice(0,
 const clientIp = req => String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '?';
 
 function newRoom(hostName) {
-  const room = { code: makeCode(), players: [], state: null, streams: new Map(), gone: new Map(), touched: Date.now(), botTimer: null };
+  const room = { code: makeCode(), players: [], state: null, streams: new Map(), gone: new Map(), touched: Date.now(), botTimer: null, voice: '', strikes: new Map(), away: new Set(), turnKey: '', turnSince: Date.now() };
   addPlayer(room, hostName, false);
   rooms.set(room.code, room);
   return room;
@@ -78,13 +79,15 @@ function addPlayer(room, name, bot) {
 
 function snapshot(room, idx) {
   return {
-    code: room.code, you: idx, host: idx === 0,
+    code: room.code, you: idx, host: idx === 0, voice: room.voice,
+    idleMsLeft: room.state && room.state.winner === null && room.state.turn === idx && !room.players[idx].bot ? Math.max(0, idleLimit(room, idx) - (Date.now() - room.turnSince)) : null,
     lobby: room.players.map((p, i) => ({ name: p.name, bot: p.bot, connected: p.bot || room.streams.has(i), color: G.COLORS[i] })),
     game: room.state ? G.view(room.state, idx) : null,
   };
 }
 function broadcast(room) {
   room.touched = Date.now();
+  if (room.state) turnClock(room);
   room.streams.forEach((set, idx) => {
     const data = `data: ${JSON.stringify(snapshot(room, idx))}\n\n`;
     set.forEach(res => res.write(data));
@@ -92,14 +95,23 @@ function broadcast(room) {
   scheduleBots(room);
 }
 
-// A bot plays for bot seats, and for a human who has been offline for a while (so a dropped phone never stalls the table).
+// Restarts the idle clock whenever the position or the player to move changes.
+function turnClock(room) {
+  const s = room.state, key = s.seq + ':' + s.turn;
+  if (key !== room.turnKey) { room.turnKey = key; room.turnSince = Date.now(); }
+}
+const idleLimit = (room, i) => (room.away.has(i) ? AWAY_MS : TURN_MS);
+const idleSeat = room => Date.now() - room.turnSince > idleLimit(room, room.state.turn);
+// A bot plays for bot seats, for a human who has been offline for a while (so a dropped phone never stalls the table),
+// and for an online human who has sat on their turn too long.
 function botShouldPlay(room) {
   const s = room.state;
   if (!s || s.winner !== null) return false;
   const p = room.players[s.turn];
   if (p.bot) return true;
+  turnClock(room);
   const t = room.gone.get(s.turn);
-  return !room.streams.has(s.turn) && t && Date.now() - t > TAKEOVER_MS;
+  return (!room.streams.has(s.turn) && t && Date.now() - t > TAKEOVER_MS) || idleSeat(room);
 }
 function scheduleBots(room) {
   clearTimeout(room.botTimer);
@@ -111,6 +123,11 @@ function scheduleBots(room) {
     room.botTimer = null;
     if (room.state !== s || !botShouldPlay(room)) return;
     const id = s.turn;
+    if (!room.players[id].bot && room.streams.has(id)) { // online but idle: count the miss
+      const n = (room.strikes.get(id) || 0) + 1;
+      room.strikes.set(id, n);
+      if (n >= MAX_STRIKES) room.away.add(id);
+    }
     let a = plan(s, id), r = a && G.act(s, id, a);
     if (!r || r.error) r = G.act(s, id, fallback(s, id));
     broadcast(room);
@@ -122,7 +139,7 @@ function fallback(s, id) {
   return { type: 'insert', slot: G.SLOTS.find(x => !s.last || x !== G.oppositeSlot(s.last)), rot: 0 };
 }
 // Picks up humans who just crossed the offline threshold.
-setInterval(() => rooms.forEach(room => { if (!room.botTimer && botShouldPlay(room)) scheduleBots(room); }), 2000).unref();
+setInterval(() => rooms.forEach(room => { if (!room.botTimer && botShouldPlay(room)) scheduleBots(room); }), 500).unref();
 
 function json(res, code, obj) {
   res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
@@ -190,6 +207,7 @@ async function api(req, res, url) {
     if (!room.state) return json(res, 400, { error: 'Not started' });
     const r = G.act(room.state, me, b.a || {});
     if (r.error) return json(res, 400, r);
+    room.strikes.delete(me); room.away.delete(me);
     broadcast(room);
     return json(res, 200, r);
   }
@@ -198,7 +216,7 @@ async function api(req, res, url) {
     if (room.state) { const p = room.players[me]; p.bot = true; p.token = null; p.name += ' (bot)'; room.state.players[me].bot = true; room.state.players[me].name = p.name; }
     else room.players.splice(me, 1);
     room.streams.forEach(set => set.forEach(r => r.end()));
-    room.streams.clear(); room.gone.clear();
+    room.streams.clear(); room.gone.clear(); room.strikes.clear(); room.away.clear();
     broadcast(room);
     return json(res, 200, { ok: true });
   }
@@ -212,11 +230,17 @@ async function api(req, res, url) {
     if (room.state || !(i > 0 && i < room.players.length)) return json(res, 400, { error: 'Cannot remove' });
     room.streams.forEach(set => set.forEach(r => r.end())); // clients reconnect with their new index
     room.players.splice(i, 1);
-    room.streams.clear(); room.gone.clear();
+    room.streams.clear(); room.gone.clear(); room.strikes.clear(); room.away.clear();
+  } else if (url.pathname === '/api/settings') {
+    if (b.voice !== undefined) {
+      const v = String(b.voice).trim().slice(0, 300);
+      if (v && !/^https?:\/\/[^\s]+$/i.test(v)) return json(res, 400, { error: 'Voice link must start with http(s)://' });
+      room.voice = v;
+    }
   } else if (url.pathname === '/api/start') {
     if (room.players.length < G.MIN_PLAYERS) return json(res, 400, { error: `Need ${G.MIN_PLAYERS}+ players` });
     clearTimeout(room.botTimer);
-    room.state = G.create(room.players);
+    room.state = G.create(room.players); room.strikes.clear(); room.away.clear();
   } else if (url.pathname === '/api/replace') { // hand a disconnected player over to a bot
     const i = Number(b.index), p = room.players[i];
     if (!p || p.bot || i === 0) return json(res, 400, { error: 'Cannot replace' });
