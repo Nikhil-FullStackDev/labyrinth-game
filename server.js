@@ -66,7 +66,7 @@ const cleanName = n => String(n || '').replace(/[^\w \-']/g, '').trim().slice(0,
 const clientIp = req => String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '?';
 
 function newRoom(hostName) {
-  const room = { code: makeCode(), players: [], state: null, streams: new Map(), gone: new Map(), touched: Date.now(), botTimer: null, voice: '', strikes: new Map(), away: new Set(), turnKey: '', turnSince: Date.now() };
+  const room = { code: makeCode(), players: [], state: null, streams: new Map(), gone: new Map(), touched: Date.now(), botTimer: null, strikes: new Map(), away: new Set(), turnKey: '', turnSince: Date.now() };
   addPlayer(room, hostName, false);
   rooms.set(room.code, room);
   return room;
@@ -79,7 +79,7 @@ function addPlayer(room, name, bot) {
 
 function snapshot(room, idx) {
   return {
-    code: room.code, you: idx, host: idx === 0, voice: room.voice,
+    code: room.code, you: idx, host: idx === 0,
     idleMsLeft: room.state && room.state.winner === null && room.state.turn === idx && !room.players[idx].bot ? Math.max(0, idleLimit(room, idx) - (Date.now() - room.turnSince)) : null,
     lobby: room.players.map((p, i) => ({ name: p.name, bot: p.bot, connected: p.bot || room.streams.has(i), color: G.COLORS[i] })),
     game: room.state ? G.view(room.state, idx) : null,
@@ -231,12 +231,6 @@ async function api(req, res, url) {
     room.streams.forEach(set => set.forEach(r => r.end())); // clients reconnect with their new index
     room.players.splice(i, 1);
     room.streams.clear(); room.gone.clear(); room.strikes.clear(); room.away.clear();
-  } else if (url.pathname === '/api/settings') {
-    if (b.voice !== undefined) {
-      const v = String(b.voice).trim().slice(0, 300);
-      if (v && !/^https?:\/\/[^\s]+$/i.test(v)) return json(res, 400, { error: 'Voice link must start with http(s)://' });
-      room.voice = v;
-    }
   } else if (url.pathname === '/api/start') {
     if (room.players.length < G.MIN_PLAYERS) return json(res, 400, { error: `Need ${G.MIN_PLAYERS}+ players` });
     clearTimeout(room.botTimer);
