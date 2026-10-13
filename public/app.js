@@ -169,8 +169,6 @@
       <div class="card"><h2>Players (${n}/4)</h2><div class="plist">${s.lobby.map((p, i) =>
         `<div class="pl" style="--c:${p.color}"><i></i><b>${esc(p.name)}${i === s.you ? ' (you)' : ''}</b><small>${i === 0 ? 'host' : p.bot ? 'bot' : p.connected ? '' : 'offline'}</small>${s.host && i > 0 ? `<button class="x" data-kick="${i}" aria-label="Remove">✕</button>` : ''}</div>`).join('')}</div>
         ${s.host ? `<button class="btn" id="bot" ${n >= 4 ? 'disabled' : ''}>+ Add bot</button>` : ''}</div>
-      ${s.voice ? `<a class="btn pri" href="${esc(s.voice)}" target="_blank" rel="noopener noreferrer" style="text-align:center;text-decoration:none">🎙 Join voice chat</a>` : ''}
-      ${s.host ? `<div class="row"><input class="field" id="voice" placeholder="Voice chat link (Discord / Meet…)" value="${esc(s.voice || '')}"><button class="btn" id="setvoice" style="flex:none">Set</button></div>` : ''}
       ${s.host ? `<button class="btn pri" id="start" ${n < 2 ? 'disabled' : ''}>${n < 2 ? 'Need 2+ players' : 'Start game'}</button>` : '<div class="tiny">Waiting for the host to start…</div>'}
       <button class="btn sm bad" id="leave">Leave room</button>
       <div class="err" id="err"></div></div>`;
@@ -183,7 +181,6 @@
     $('#leave').onclick = async () => { await call('/api/leave', { code: net.code, token: net.token }); leaveNet(); home(); };
     if (s.host) {
       $('#bot').onclick = () => hostCall('/api/addbot');
-      $('#setvoice').onclick = () => hostCall('/api/settings', { voice: $('#voice').value });
       $('#start').onclick = () => hostCall('/api/start');
       app.querySelectorAll('[data-kick]').forEach(b => b.onclick = () => hostCall('/api/kick', { index: +b.dataset.kick }));
     }
@@ -455,9 +452,7 @@
   }
 
   function menu() {
-    const voice = net && net.snap && net.snap.voice;
     const s = sheet(`<h2>Menu</h2>
-      ${voice ? `<a class="btn pri" href="${esc(voice)}" target="_blank" rel="noopener noreferrer" style="text-align:center;text-decoration:none">🎙 Join voice chat</a>` : ''}
       <button class="btn" id="m-how">How to play</button>
       <button class="btn bad" id="m-quit">${local ? 'Quit to menu' : 'Leave game'}</button>
       <button class="btn pri" data-close>Back to game</button>`);
