@@ -249,9 +249,16 @@ async function api(req, res, url) {
   json(res, 200, { ok: true });
 }
 
+// In-room chat (shared module): its own SSE stream + POST endpoint, independent of the game's connection.
+const chat = require('./chat-server.js')({
+  room: code => rooms.get(code),
+  who: (room, token) => { const p = room.players.find(q => q.token && q.token === token); return p ? p.name : null; },
+});
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   if (url.pathname === '/healthz') return json(res, 200, { ok: true, rooms: rooms.size });
+  if (chat.handle(req, res, url)) return;
   if (url.pathname.startsWith('/api/')) return api(req, res, url).catch(() => json(res, 500, { error: 'Server error' }));
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
   serveStatic(req, res, url.pathname);
