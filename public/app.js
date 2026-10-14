@@ -518,4 +518,6 @@
   }, 500);
 })(() => net && net.snap);
 
+  // In-room chat with emotes (shared chat.js).
+  if (window.Chat) Chat.useSSE({ session: () => (net && net.code && net.token ? { code: net.code, token: net.token } : null), bottom: 84 });
 })();
