@@ -65,6 +65,15 @@ function makeCode() {
 const cleanName = n => String(n || '').replace(/[^\w \-']/g, '').trim().slice(0, 14) || 'Player';
 const clientIp = req => String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '?';
 
+// Presence: a seat counts as online while it has a live stream, and for a short grace after it joined or its
+// last stream dropped, so joining or a network blip never flashes "offline".
+const PRESENCE_GRACE_MS = 12000;
+const presentSeat = (room, i) => room.streams.has(i) || (!!room.players[i] && Date.now() - (room.players[i].seenAt || 0) < PRESENCE_GRACE_MS);
+function presenceLater(room) {
+  setTimeout(() => { if (rooms.get(room.code) === room) broadcast(room); }, PRESENCE_GRACE_MS + 300).unref();
+}
+const markSeen = (room, i) => { if (room.players[i]) room.players[i].seenAt = Date.now(); presenceLater(room); };
+
 function newRoom(hostName) {
   const room = { code: makeCode(), players: [], state: null, streams: new Map(), gone: new Map(), touched: Date.now(), botTimer: null, strikes: new Map(), away: new Set(), turnKey: '', turnSince: Date.now() };
   addPlayer(room, hostName, false);
@@ -72,8 +81,9 @@ function newRoom(hostName) {
   return room;
 }
 function addPlayer(room, name, bot) {
-  const p = { name, bot, token: bot ? null : crypto.randomBytes(8).toString('hex') };
+  const p = { name, bot, seenAt: Date.now(), token: bot ? null : crypto.randomBytes(8).toString('hex') };
   room.players.push(p);
+  if (!bot) presenceLater(room);
   return p;
 }
 
@@ -81,7 +91,7 @@ function snapshot(room, idx) {
   return {
     code: room.code, you: idx, host: idx === 0,
     idleMsLeft: room.state && room.state.winner === null && room.state.turn === idx && !room.players[idx].bot ? Math.max(0, idleLimit(room, idx) - (Date.now() - room.turnSince)) : null,
-    lobby: room.players.map((p, i) => ({ name: p.name, bot: p.bot, connected: p.bot || room.streams.has(i), color: G.COLORS[i] })),
+    lobby: room.players.map((p, i) => ({ name: p.name, bot: p.bot, connected: p.bot || presentSeat(room, i), color: G.COLORS[i] })),
     game: room.state ? G.view(room.state, idx) : null,
   };
 }
@@ -170,7 +180,7 @@ async function api(req, res, url) {
     req.on('close', () => {
       clearInterval(ping);
       const cur = room.streams.get(idx);
-      if (cur) { cur.delete(res); if (!cur.size) { room.streams.delete(idx); room.gone.set(idx, Date.now()); } }
+      if (cur) { cur.delete(res); if (!cur.size) { room.streams.delete(idx); markSeen(room, idx); room.gone.set(idx, Date.now()); } }
       broadcast(room);
     });
     broadcast(room);
