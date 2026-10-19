@@ -147,6 +147,8 @@
     if (!document.hidden && net && net.es && net.es.readyState !== 1) connect();
     if (!document.hidden) requestWake();
   });
+  const wake = () => { if (net && net.es && net.es.readyState !== 1) connect(); };
+  addEventListener('online', wake); addEventListener('pageshow', wake);
 
   function onSnap(s) {
     snap = s; net.snap = s; you = s.you;
